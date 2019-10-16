@@ -39,7 +39,10 @@ class LiveTranscribeViewController: UIViewController {
     let speechRecognizer = SFSpeechRecognizer()
     let request = SFSpeechAudioBufferRecognitionRequest()
     var recognitionTask: SFSpeechRecognitionTask?
-
+    
+    var recognitionRequest = SFSpeechAudioBufferRecognitionRequest()
+    
+    
   @IBOutlet weak var imageView: GLKView!
   var faceReplacer: FaceReplacer!
   
@@ -82,48 +85,65 @@ class LiveTranscribeViewController: UIViewController {
 }
 
 extension LiveTranscribeViewController {
-  fileprivate func startRecording() throws {
-    DispatchQueue.main.async {
-         self.transcriptionOutputLabel.text = ""
-    }
-   
+  func startRecording() throws {
+    
     // 1
-    let node = audioEngine.inputNode
+   
     
     print(audioEngine.inputNode.inputFormat(forBus: 0))
     print(audioEngine.inputNode.outputFormat(forBus: 0))
   
-    
-    //let recordingFormat = node.outputFormat(forBus: 0)
-    let recordingFormat = node.inputFormat(forBus: 0)
-//trying
-    let mixer = audioEngine.mainMixerNode
-    let format = mixer.outputFormat(forBus: 0)
-    print(format)
+     let node = audioEngine.inputNode
     // 2
     
     let sampleRate = AVAudioSession.sharedInstance().sampleRate
-    let fmt = AVAudioFormat(commonFormat: .pcmFormatFloat32, sampleRate: 48000, channels: 1, interleaved: false)
+
+    let fmt = AVAudioFormat(commonFormat: .pcmFormatFloat32, sampleRate: sampleRate, channels: 1, interleaved: false)
     
     print("Rate is \(sampleRate)")
-    
+   
     node.installTap(onBus: 0, bufferSize: 1024,
-                    format: fmt) { [unowned self]
+                    format: node.inputFormat(forBus: 0)) { [unowned self]
       (buffer, _) in
       self.request.append(buffer)
     }
- print("Made it!")
+    
+    /*
+    node.installTap(onBus: 0, bufferSize: 2048, format: fmt, block: {[unowned self]
+        (buffer, _) in
+        self.recognitionRequest.append(buffer)
+    })
+    */
     // 3
+    audioEngine.reset()
     audioEngine.prepare()
     do{
      try audioEngine.start()
     } catch let error {
         print("aargh \(error.localizedDescription)")
     }
+    ////////////////
+    /*
+    //guard let recognitionRequest = recognitionRequest else { fatalError("Unable to create bufferRecognizerRequest object") }
+    recognitionRequest.shouldReportPartialResults = true
     
+    if #available(iOS 13, *){
+        recognitionRequest.requiresOnDeviceRecognition = true
+    } else {
+        print("no on device available")
+    }
+    
+    ///////////////
+    */
+    if #available(iOS 13, *){
+        print("hey iOS 13!")
+    } else {
+        print("nope")
+    }
+    //recognitionTask = speechRecognizer?.recognitionTask(with: recognitionRequest, resultHandler: {
     recognitionTask = speechRecognizer?.recognitionTask(with: request) {
       [unowned self]
-      (result, _) in
+      (result, error) in
       if let transcription = result?.bestTranscription {
         DispatchQueue.main.async(execute:{
               // self.transcriptionOutputLabel.text = transcription.formattedString
@@ -131,7 +151,15 @@ extension LiveTranscribeViewController {
             print(transcription.formattedString)
         })
      
-      }
+      }/*
+        var isFinal = false
+
+         if let result = result, result.isFinal {
+             print("Result: \(result.bestTranscription.formattedString)")
+             isFinal = result.isFinal
+            self.updateText(txt:result.bestTranscription.formattedString)
+         }
+*/
     }
 
   }
@@ -144,7 +172,10 @@ extension LiveTranscribeViewController {
 
     func updateText(txt:String){
         print("called")
-        self.transcriptionOutputLabel.text = txt
+        DispatchQueue.main.async(execute: {
+             self.transcriptionOutputLabel.text = txt
+        })
+       
     }
 }
 
@@ -169,3 +200,12 @@ extension LiveTranscribeViewController {
   }
 }
 
+/*
+ 
+     //let recordingFormat = node.outputFormat(forBus: 0)
+     let recordingFormat = node.inputFormat(forBus: 0)
+ //trying
+     let mixer = audioEngine.mainMixerNode
+     let format = mixer.outputFormat(forBus: 0)
+     print(format)
+ */
